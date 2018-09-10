@@ -261,7 +261,7 @@ def write_readme(role):
     dependencies = role_settings["dependencies"]
     example_playbook = role_settings["example_playbook"]
     templates = get_templates_path()
-    task_names, role_vars = read_tasks(role)
+    _, role_vars = read_tasks(role)
 
     template_loader = FileSystemLoader(searchpath=templates)
     template_env = Environment(loader=template_loader)
