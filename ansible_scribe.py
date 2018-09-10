@@ -109,21 +109,24 @@ def get_templates_path():
     return templates
 
 
-def write_license(license, author, path):
+def write_license():
     """ Writes out a template file for a role """
     now = datetime.datetime.now()
     year = now.year
-    licenses = os.path.join(get_templates_path(), "licenses")
+    author = settings["author"]
+    license = settings["license"]
     licensej2 = "{}.j2".format(license)
+    licenses = os.path.join(get_templates_path(), "licenses")
+
     template_loader = FileSystemLoader(searchpath=licenses)
     template_env = Environment(loader=template_loader)
     template = template_env.get_template(licensej2)
-    data = template.render(copyright_holder=settings["author"], year=year)
+    data = template.render(copyright_holder=author, year=year)
 
     if overwrite:
-        role_license = os.path.join(settings["roles_path"], licensej2)
+        role_license = os.path.join(settings["roles_path"], license)
     else:
-        role_license = os.path.join(settings["output_dir"], licensej2)
+        role_license = os.path.join(settings["output_dir"], license)
     with open(role_license, "wb") as rl:
         rl.write(data)
 
@@ -131,7 +134,43 @@ def write_license(license, author, path):
 def write_meta(role):
     """ Write a meta/main.yml file for galaxy """
     role_settings = read_config(role)
-    print(role_settings)
+    author = settings["author"]
+    company = settings["company"]
+    license = settings["license"]
+    description = role_settings["description"]
+    issue_tracker = role_settings["issue_tracker"]
+    min_ansible_version = role_settings["min_ansible_version"]
+    min_container_version = role_settings["min_container_version"]
+    branch = role_settings["branch"]
+    platforms = role_settings["platforms"]
+    galaxy_tags = role_settings["galaxy_tags"]
+    outside_deps = role_settings["outside_deps"]
+    templates = get_templates_path()
+
+    template_loader = FileSystemLoader(searchpath=templates)
+    template_env = Environment(loader=template_loader)
+    template = template_env.get_template("meta.j2")
+    data = template.render(
+        role_name=role,
+        name=author,
+        desc=description,
+        co=company,
+        issue=issue_tracker,
+        lic=license,
+        mav=min_ansible_version,
+        mcv=min_container_version,
+        gh_branch=branch,
+        p=platforms,
+        tags=galaxy_tags,
+        deps=outside_deps,
+    )
+
+    if overwrite:
+        meta = os.path.join(settings["roles_path"], "meta", "main.yml")
+    else:
+        meta = os.path.join(settings["output_dir"], "meta.yml")
+    with open(meta, "wb") as m:
+        m.write(data)
 
 
 def write_readme(role):

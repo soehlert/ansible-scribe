@@ -1,12 +1,12 @@
 galaxy_info:
-  role_name: {{ role }}
-  author: {{ author | default(omit) }}
-  description: {{ description | default(omit) }}
-  company: {{ company | default(omit) }}
+  role_name: {{ role_name }}
+  author: {{ name | default(omit) }}
+  description: {{ desc | default(omit) }}
+  company: {{ co | default(omit) }}
 
   # If the issue tracker for your role is not on github, uncomment the
   # next line and provide a value
-  issue_tracker_url: {{ issue_tracker | default(omit) }}
+  issue_tracker_url: {{ issue | default(omit) }}
 
   # Some suggested licenses:
   # - BSD (default)
@@ -15,12 +15,12 @@ galaxy_info:
   # - GPLv3
   # - Apache
   # - CC-BY
-  license: {{ license | default(omit) }}
+  license: {{ lic | default(omit) }}
 
-  min_ansible_version: {{ min_ansible_version | default(omit) }}
+  min_ansible_version: {{ mav | default(omit) }}
 
   # If this a Container Enabled role, provide the minimum Ansible Container version.
-  min_ansible_container_version: {{ min_ansible_container_version | default(omit) }}
+  min_ansible_container_version: {{ mcv | default(omit) }}
 
   # Optionally specify the branch Galaxy will use when accessing the GitHub
   # repo for this role. During role install, if no tags are available,
@@ -28,11 +28,11 @@ galaxy_info:
   # this branch. If Travis integration is configured, only notifications for this
   # branch will be accepted. Otherwise, in all cases, the repo's default branch
   # (usually master) will be used.
-  github_branch: {{ branch | default(omit) }}
+  github_branch: {{ gh_branch | default(omit) }}
 
-{% if platforms is defined %}
+{% if p is defined %}
   platforms:
-  {% for k,v in platforms.items() %}
+  {% for k,v in p.items() %}
   - name: {{ key }}
     versions:
     {% for x in v %}
@@ -57,9 +57,9 @@ galaxy_info:
 {% endif %}
 
 
-{% if galaxy_tags is defined %}
+{% if tags is defined %}
   galaxy_tags:
-  {% for i in galaxy_tags %}
+  {% for i in tags %}
     - {{ i }}
   {% endfor %}
 {% else %}
@@ -72,9 +72,9 @@ galaxy_info:
     #       Maximum 20 tags per role.
 {% endif %}
 
-{% if outside_deps is defined %}
+{% if deps is defined %}
   dependencies:
-  {% for i in outside_deps %}
+  {% for i in deps %}
     - {{ i }}
   {% endfor %}
 {% else %}
