@@ -45,7 +45,7 @@ args, remaining_argv = parser.parse_known_args()
 conf_file = args.conf_file
 conf = ConfigObj(conf_file)
 
-acceptable_log_levels = ["INFO", "WARNING"]
+acceptable_log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 log_level = args.log_level
 overwrite = args.overwrite
 
