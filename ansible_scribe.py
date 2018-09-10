@@ -7,10 +7,9 @@ import os
 import sys
 import yaml
 
-from builtins import FileExistsError
 from configobj import ConfigObj
 from jinja2 import Environment, FileSystemLoader
-
+from yaml import Dumper
 
 user_home = os.path.expanduser("~")
 config_dir = os.path.join(user_home, ".config/ansible-scribe")
@@ -39,20 +38,20 @@ settings = {}
 overwrite = args.overwrite
 conf_file = args.conf_file
 conf = ConfigObj(conf_file)
-settings["roles_path"] = conf["paths"]["roles"]
-settings["playbooks_dir"] = conf["paths"]["playbooks"]
-settings["output_dir"] = conf["paths"]["output"]
-settings["license"] = conf["metadata"]["license"]
-settings["author"] = conf["metadata"]["author"]
-settings["bio"] = conf["metadata"]["bio"]
-settings["company"] = conf["metadata"]["company"]
-settings["ci_type"] = conf["ci"]["type"]
+settings["roles_path"] = conf["Paths"]["roles"]
+settings["playbooks_dir"] = conf["Paths"]["playbooks"]
+settings["output_dir"] = conf["Paths"]["output"]
+settings["repo_license"] = conf["Metadata"]["repo_license"]
+settings["author"] = conf["Metadata"]["author"]
+settings["bio"] = conf["Metadata"]["bio"]
+settings["company"] = conf["Metadata"]["company"]
+settings["ci_type"] = conf["CI"]["type"]
 
 
 def read_config(role):
     """ Reads a config file for a role """
-    suffix = ".conf"
-    role_config = os.path.join(config_dir, role, suffix)
+    role_file = "{}.conf".format(role)
+    role_config = os.path.join(config_dir, role_file)
     with open(role_config, "r") as r_c:
         role_settings = {}
         conf = ConfigObj(r_c)
@@ -64,11 +63,13 @@ def read_config(role):
         role_settings["repo"] = conf["urls"]["repo"]
         role_settings["description"] = conf["config"]["description"]
         role_settings["requirements"] = conf["config"]["requirements"]
-        role_settings["outside_deps"] = conf["config"]["outside_deps"]
         role_settings["galaxy_tags"] = conf["config"]["galaxy_tags"]
         role_settings["playbook"] = conf["config"]["playbook"]
 
-        # dependencies = ()
+        if role_settings["issue_tracker"] == "":
+            print("empty")
+
+        dependencies = []
         playbooks_dir = settings["playbooks_dir"]
         playbook = role_settings["playbook"]
         if playbook:
@@ -76,17 +77,27 @@ def read_config(role):
             with open(playbook_file, "r") as p:
                 try:
                     data = yaml.safe_load(p)
-                    print(data)
+                    d = yaml.dump(data, Dumper=Dumper)
+                    role_settings["example_playbook"] = d
+                    roles_list = []
+                    for section in data:
+                        for k, v in section.items():
+                            if k == "roles":
+                                roles_list.append(v)
+                    for roles in roles_list:
+                        for role in roles:
+                            if "." in role:
+                                dependencies.append(role)
                 except yaml.YAMLError as exc:
                     print(exc)
+        role_settings["dependencies"] = dependencies
 
         pforms = {}
-        for platform in conf["platforms"]:
-            for (key, value) in platform.items():
-                if key in pforms:
-                    pforms[key].append(value)
-                else:
-                    pforms[key] = [value]
+        for platform, version in conf["platforms"].items():
+            if platform in pforms:
+                pforms[platform].append(version)
+            else:
+                pforms[platform] = [version]
         role_settings["platforms"] = pforms
 
     return role_settings
@@ -111,26 +122,43 @@ def get_templates_path():
 
 def get_task_files(role):
     """ Function to grab all the tasks files we will need """
-    task_files = ()
-    tasks_dir = os.join.path(settings["roles_path"], role, "tasks")
+    task_files = []
+    tasks_dir = os.path.join(settings["roles_path"], role, "tasks")
     for fn in os.listdir(tasks_dir):
         if fn.endswith(".yaml") or fn.endswith(".yml"):
-            task_files.append(fn)
+            full_path = os.path.join(tasks_dir, fn)
+            task_files.append(full_path)
     return task_files
 
 
 def read_tasks(role):
     """ Reads in task files to build variables list and task list """
-    task_names = ()
-    role_vars = ()
-    task_files = get_task_files()
+    task_names = []
+    role_vars = []
+    task_files = get_task_files(role)
+    extra_keys = [
+        "name",
+        "with_items",
+        "command",
+        "when",
+        "block",
+        "delegate_to",
+        "rescue",
+        "args",
+    ]
     for fn in task_files:
         with open(fn, "r") as f:
             try:
                 data = yaml.safe_load(f)
-                print(data)
-            except yaml.YAMLError as exc:
-                print(exc)
+                for task in data:
+                    task_names.append(task["name"])
+                    for task_name, module in task.items():
+                        if task_name not in extra_keys:
+                            for k, v in module.items():
+                                if str(v).startswith("{{") and "item" not in v:
+                                    role_vars.append(v.strip("{{ ").rstrip("}"))
+            except yaml.YAMLError:
+                pass
 
     return task_names, role_vars
 
@@ -138,32 +166,47 @@ def read_tasks(role):
 def read_defaults(role):
     """ Read the defaults file for the role to check if it's filled out """
     roles = settings["roles_path"]
+    default_vars = []
     defaults_dir = os.path.join(roles, role, "defaults")
-    defaults = os.path.join(defaults_dir, "defaults.yml")
-    with open(defaults, "r+") as d:
+    defaults = os.path.join(defaults_dir, "main.yml")
+    with open(defaults, "r") as d:
+        num_lines = sum(1 for i in d)
+        if num_lines <= 2:
+            print("WARNING: Default variables are not set")
+            return
+    with open(defaults, "r") as d:
         data = yaml.safe_load(d)
-        print(data)
+        for key, value in data.items():
+            if value is None:
+                print("WARNING: {} has no value".format(key))
+                default_vars.append(key)
+            else:
+                default_vars.append(key)
+
+    return default_vars
 
 
-def write_license(role):
-    """ Write out a license file for a role """
+def write_repo_license(role):
+    """ Write out a repo_license file for a role """
     now = datetime.datetime.now()
     year = now.year
     author = settings["author"]
-    license = settings["license"]
-    licensej2 = "{}.j2".format(license)
+    repo_license = settings["repo_license"]
+    repo_licensej2 = "{}.j2".format(repo_license)
     licenses = os.path.join(get_templates_path(), "licenses")
 
     template_loader = FileSystemLoader(searchpath=licenses)
     template_env = Environment(loader=template_loader)
-    template = template_env.get_template(licensej2)
+    template = template_env.get_template(repo_licensej2)
     data = template.render(copyright_holder=author, year=year)
 
     if overwrite:
-        role_license = os.path.join(settings["roles_path"], role, license)
+        role_repo_license = os.path.join(
+            settings["roles_path"], role, repo_license.upper()
+        )
     else:
-        role_license = os.path.join(settings["output_dir"], license)
-    with open(role_license, "wb") as rl:
+        role_repo_license = os.path.join(settings["output_dir"], repo_license.upper())
+    with open(role_repo_license, "w") as rl:
         rl.write(data)
 
 
@@ -172,11 +215,10 @@ def write_meta(role):
     role_settings = read_config(role)
     author = settings["author"]
     company = settings["company"]
-    license = settings["license"]
+    repo_license = settings["repo_license"]
     branch = role_settings["branch"]
     platforms = role_settings["platforms"]
     galaxy_tags = role_settings["galaxy_tags"]
-    outside_deps = role_settings["outside_deps"]
     description = role_settings["description"]
     issue_tracker = role_settings["issue_tracker"]
     min_ansible_version = role_settings["min_ansible_version"]
@@ -192,20 +234,19 @@ def write_meta(role):
         desc=description,
         co=company,
         issue=issue_tracker,
-        lic=license,
+        lic=repo_license,
         mav=min_ansible_version,
         mcv=min_container_version,
         gh_branch=branch,
         p=platforms,
         tags=galaxy_tags,
-        deps=outside_deps,
     )
 
     if overwrite:
         meta = os.path.join(settings["roles_path"], role, "meta", "main.yml")
     else:
         meta = os.path.join(settings["output_dir"], "meta.yml")
-    with open(meta, "wb") as m:
+    with open(meta, "w") as m:
         m.write(data)
 
 
@@ -214,10 +255,11 @@ def write_readme(role):
     role_settings = read_config(role)
     author = settings["author"]
     bio = settings["bio"]
-    license = settings["license"]
+    repo_license = settings["repo_license"]
     description = role_settings["description"]
     requirements = role_settings["requirements"]
-    playbook = role_settings["playbook"]
+    dependencies = role_settings["dependencies"]
+    example_playbook = role_settings["example_playbook"]
     templates = get_templates_path()
     task_names, role_vars = read_tasks(role)
 
@@ -227,11 +269,12 @@ def write_readme(role):
     data = template.render(
         role_name=role,
         desc=description,
+        tasks=task_names,
         reqs=requirements,
         variables=role_vars,
-        # deps=dependencies,
-        example_playbook=playbook,
-        lic=license,
+        deps=dependencies,
+        example_playbook=example_playbook,
+        lic=repo_license,
         name=author,
         author_bio=bio,
     )
@@ -240,8 +283,28 @@ def write_readme(role):
         readme = os.path.join(settings["roles_path"], role, "README.md")
     else:
         readme = os.path.join(settings["output_dir"], "readme.md")
-    with open(readme, "wb") as r:
+    with open(readme, "w") as r:
         r.write(data)
+
+
+def write_defaults_file(role):
+    """ Writes out any default variables that don't exist already """
+    roles = settings["roles_path"]
+    default_vars = read_defaults(role)
+    task_names, role_vars = read_tasks(role)
+    vars_to_add = []
+    for var in role_vars:
+        if not default_vars or var not in default_vars:
+            vars_to_add.append(var)
+    if overwrite:
+        defaults_dir = os.path.join(roles, role, "defaults")
+        defaults = os.path.join(defaults_dir, "main.yml")
+    else:
+        defaults = os.path.join(settings["output_dir"], "defaults.yml")
+
+    with open(defaults, "a") as d:
+        for var in vars_to_add:
+            d.write(var)
 
 
 def write_ci_file(ci_type, role):
@@ -251,26 +314,35 @@ def write_ci_file(ci_type, role):
     elif ci_type == "travis":
         ci_file = ".travis.yml"
 
-    ci = os.path.join(settings["roles_path"], role, ci_file)
+    if overwrite:
+        ci = os.path.join(settings["roles_path"], role, ci_file)
+    else:
+        ci = os.path.join(settings["output_dir"], ci_file)
 
     try:
-        open(ci, "x")
-    except FileExistsError:
+        open(ci, "ab", 0).close()
+    except OSError:
         pass
 
 
 if __name__ == "__main__":
-    roles = ()
-    for fn in os.listdir(settings[config_dir]):
+    roles = []
+    for fn in os.listdir(config_dir):
         if fn != "global.conf":
             f = os.path.splitext(fn)[0]
             roles.append(f)
-    # try:
-    #     settings["output_dir"]
-    # except NameError:
-    #     pass
-    # else:
-    #     create_output_dir(settings["output_dir"])
 
-    for i in roles:
-        read_config(i)
+    try:
+        settings["output_dir"]
+    except NameError:
+        pass
+    else:
+        create_output_dir()
+
+    for role in roles:
+        read_config(role)
+        write_repo_license(role)
+        write_ci_file(settings["ci_type"], role)
+        write_meta(role)
+        write_readme(role)
+        write_defaults_file(role)
