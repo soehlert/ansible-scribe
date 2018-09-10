@@ -2,11 +2,13 @@
 
 import argparse
 import datetime
+import errno
 import os
 import sys
 import yaml
 
-from configparser import ConfigParser
+from builtins import FileExistsError
+from configobj import ConfigObj
 from jinja2 import Environment, FileSystemLoader
 
 
@@ -33,35 +35,54 @@ parser.add_argument(
 args, remaining_argv = parser.parse_known_args()
 
 settings = {}
+overwrite = args.overwrite
 conf_file = args.conf_file
-conf = ConfigParser(allow_no_value=True)
-conf.read([conf_file])
-settings["roles_path"] = conf.get("paths", "roles")
-settings["playbooks_path"] = conf.get("paths", "playbooks")
-settings["output_dir"] = conf.get("paths", "output")
-settings["license"] = conf.get("metadata", "license")
-settings["author"] = conf.get("metadata", "author")
-settings["company"] = conf.get("metadata", "company")
-settings["ci_type"] = conf.get("CI", "type")
+conf = ConfigObj(conf_file)
+settings["roles_path"] = conf["paths"]["roles"]
+settings["playbooks_path"] = conf["paths"]["playbooks"]
+settings["output_dir"] = conf["paths"]["output"]
+settings["license"] = conf["metadata"]["license"]
+settings["author"] = conf["metadata"]["author"]
+settings["bio"] = conf["metadata"]["bio"]
+settings["company"] = conf["metadata"]["company"]
+settings["ci_type"] = conf["ci"]["type"]
+
+
+def create_output_dir(output_dir):
+    """ Create the output dir if it doesn't exist """
+    try:
+        os.makedirs(output_dir)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
 
 
 def read_config(role):
-    """ Loads a config file for a role """
+    """ Reads a config file for a role """
     suffix = ".conf"
     role_config = os.path.join(config_dir, role, suffix)
     with open(role_config, "r") as r_c:
         role_settings = {}
-        conf = ConfigParser(allow_no_value=True)
-        conf.read([r_c])
-        role_settings["role_version"] = conf.get("versions", "role")
-        role_settings["min_ansible_version"] = conf.get("versions", "ansible_min")
-        role_settings["repo"] = conf.get("urls", "repo")
-        role_settings["issue_tracker"] = conf.get("urls", "issue_tracker")
-        role_settings["playbook"] = conf.get("config", "playbook")
-        role_settings["description"] = conf.get("config", "description")
-        role_settings["platforms"] = conf.get("config", "platforms")
-        role_settings["outside_deps"] = conf.get("config", "dependencies")
-        role_settings["galaxy_tags"] = conf.get("config", "galaxy_tags")
+        conf = ConfigObj(r_c)
+        role_settings["min_ansible_version"] = conf["versions"]["ansible_min"]
+        role_settings["min_container_version"] = conf["versions"]["container_min"]
+        role_settings["role_version"] = conf["versions"]["role"]
+        role_settings["branch"] = conf["urls"]["branch"]
+        role_settings["issue_tracker"] = conf["urls"]["issue_tracker"]
+        role_settings["repo"] = conf["urls"]["repo"]
+        role_settings["description"] = conf["config"]["description"]
+        role_settings["galaxy_tags"] = conf["config"]["galaxy_tags"]
+        role_settings["outside_deps"] = conf["config"]["outside_deps"]
+        role_settings["playbook"] = conf["config"]["playbook"]
+
+        pforms = {}
+        for platform in conf["platforms"]:
+            for (key, value) in platform.items():
+                if key in pforms:
+                    pforms[key].append(value)
+                else:
+                    pforms[key] = [value]
+        role_settings["platforms"] = pforms
 
     return role_settings
 
@@ -82,8 +103,7 @@ def read_defaults(role):
 
 
 def get_templates_path():
-    """ Help us figure out where the script is running from so we can find
-    files we need """
+    """ Find out where the templates are so we can load them later """
     script_path = os.path.dirname(os.path.realpath(sys.argv[0]))
     templates = os.path.join(script_path, "templates")
     return templates
@@ -100,10 +120,47 @@ def write_license(license, author, path):
     template = template_env.get_template(licensej2)
     data = template.render(copyright_holder=settings["author"], year=year)
 
-    role_license = os.path.join(settings["roles_path"], licensej2)
+    if overwrite:
+        role_license = os.path.join(settings["roles_path"], licensej2)
+    else:
+        role_license = os.path.join(settings["output_dir"], licensej2)
     with open(role_license, "wb") as rl:
         rl.write(data)
 
 
+def write_meta(role):
+    """ Write a meta/main.yml file for galaxy """
+    role_settings = read_config(role)
+    print(role_settings)
+
+
+def write_readme(role):
+    """ Write out a new readme file """
+    role_settings = read_config(role)
+    print(role_settings)
+
+
+def write_ci_file(ci_type, path):
+    """ Touch the correct CI file type """
+    if ci_type == "gitlab":
+        ci_file = "gitlab-ci.yml"
+    elif ci_type == "travis":
+        ci_file = ".travis.yml"
+
+    ci = os.path.join(settings["roles_path"], ci_file)
+
+    try:
+        open(ci, "x")
+    except FileExistsError:
+        pass
+
+
 if __name__ == "__main__":
-    pass
+    try:
+        settings["output_dir"]
+    except NameError:
+        pass
+    else:
+        create_output_dir(settings["output_dir"])
+
+    write_ci_file()
