@@ -1,4 +1,6 @@
-Ansible Scribe
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/1aee2b5314054ad4a751754fc7500342)](https://www.codacy.com/app/soehlert/ansible-scribe?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=soehlert/ansible-scribe&amp;utm_campaign=Badge_Grade)
+
+## Ansible Scribe
 
 Ansible Scribe sets out to automate as much as it can with regards to getting a role well documented and ready for sharing with the Ansible community via Ansible Galaxy. It tries to push you towards a more easily usable role by others and pushes a few ideas of “best practices” on you:
 
@@ -56,10 +58,12 @@ Config file for individual role(s) (~/.config/ansible-scribe/rolename.conf)
 Pass it a role:
 
 1. reads all the variables and creates a table for them in the readme.
-  | Variable    | Purpose                              | Default |
-  |-------------|--------------------------------------|---------|
-  | apache_port | defines port for apache to listen on | 80      |
-  | test        | a variable for testing               | none    |
+  
+    | Variable    | Purpose                              | Default |
+    |-------------|--------------------------------------|---------|
+    | apache_port | defines port for apache to listen on | 80      |
+    | test        | a variable for testing               | none    |
+
 2. Makes sure all the variables are in the defaults/main.yml file 
 3. Takes task names and sets them in a list in readme.md file to give you a skeleton to build off of 
 4. Reads playbook in order to 
