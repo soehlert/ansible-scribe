@@ -59,10 +59,10 @@ Pass it a role:
 
 1. reads all the variables and creates a table for them in the readme.
   
-  | Variable    | Purpose                              | Default |
-  |-------------|--------------------------------------|---------|
-  | apache_port | defines port for apache to listen on | 80      |
-  | test        | a variable for testing               | none    |
+    | Variable    | Purpose                              | Default |
+    |-------------|--------------------------------------|---------|
+    | apache_port | defines port for apache to listen on | 80      |
+    | test        | a variable for testing               | none    |
 
 2. Makes sure all the variables are in the defaults/main.yml file 
 3. Takes task names and sets them in a list in readme.md file to give you a skeleton to build off of 
