@@ -45,7 +45,6 @@ args, remaining_argv = parser.parse_known_args()
 conf_file = args.conf_file
 conf = ConfigObj(conf_file)
 
-acceptable_log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 log_level = args.log_level
 overwrite = args.overwrite
 
@@ -55,11 +54,20 @@ console = logging.StreamHandler()
 format_str = "%(levelname)s: %(filename)s:%(lineno)s -- %(message)s"
 console.setFormatter(logging.Formatter(format_str))
 log.addHandler(console)
-if log_level.upper() not in acceptable_log_levels:
-    log.critical("Please choose either INFO or WARNING for log level")
+
+acceptable_log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+ll = log_level.upper()
+if ll not in acceptable_log_levels:
+    log.critical("Please choose an accepted python logging level")
     sys.exit()
-elif log_level.upper() == "WARNING":
+elif ll == "CRITICAL":
+    log.setLevel(logging.CRITICAL)
+elif ll == "ERROR":
+    log.setLevel(logging.ERROR)
+elif ll == "WARNING":
     log.setLevel(logging.WARNING)
+elif ll == "DEBUG":
+    log.setLevel(logging.DEBUG)
 else:
     log.setLevel(logging.INFO)
 
