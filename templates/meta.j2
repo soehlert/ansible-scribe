@@ -7,7 +7,7 @@ galaxy_info:
 
   # If the issue tracker for your role is not on github, uncomment the
   # next line and provide a value
-  {% if issue | length  == 0 %}# issue_tracker_url:{% else %}issue_tracker: {{ issue }}{% endif %}
+  {% if not issue %}# issue_tracker:{% else %}issue_tracker: {{ issue }}{% endif %}
 
   # Some suggested licenses:
   # - BSD (default)

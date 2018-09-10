@@ -1,0 +1,5 @@
+---
+# defaults file for {{ role_name }}
+{% for key, value in defaults_dict.items() %}{{ key }}: {{ value }}{% endfor %}
+{% for role_var in role_vars %}{{ role_var }}{% endfor %}
+

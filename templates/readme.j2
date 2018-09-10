@@ -3,9 +3,9 @@
 {% for i in tasks %}
 {{ i }}
 {% endfor %}
-
 ### Requirements
-{{ reqs }}
+{% if reqs %}{{ reqs }}{% else %}N/A
+{% endif %}
 
 ### Role Variables
 
@@ -14,19 +14,14 @@
 {% for i in variables %}| {{ i }} | | |{% endfor %}
 
 ### Dependencies
-{% if deps %}
-{{ deps }}
-{% else %}
-N/A
+{% if deps %}{{ deps }}{% else %}N/A
 {% endif %}
-{% for i in deps %}{% for x in i %}{{ x }}
-{% endfor %}{% endfor %}
 
 ### Example Playbook
 {{ example_playbook }}
 
 ### License
-{{ lic | upper}}
+{{ lic | upper }}
 
 ### Author Information
 {{ name }}: {{ author_bio }}
