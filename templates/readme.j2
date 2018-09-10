@@ -1,20 +1,33 @@
 ## Ansible Role: {{ role_name }}
 {{ desc }}
+{% for i in tasks %}
+{{ i }}
+{% endfor %}
 
 ### Requirements
 {{ reqs }}
 
 ### Role Variables
-{{ variables }}
+
+| Variable    | Purpose                              | Default |
+|-------------|--------------------------------------|---------|
+{% for i in variables %}| {{ i }} | | |{% endfor %}
 
 ### Dependencies
+{% if deps %}
 {{ deps }}
+{% else %}
+N/A
+{% endif %}
+{% for i in deps %}{% for x in i %}{{ x }}
+{% endfor %}{% endfor %}
 
 ### Example Playbook
 {{ example_playbook }}
 
 ### License
-{{ lic }}
+{{ lic | upper}}
 
 ### Author Information
 {{ name }}: {{ author_bio }}
+
