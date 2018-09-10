@@ -3,13 +3,14 @@
 import argparse
 import datetime
 import errno
+import logging
 import os
 import sys
 import yaml
 
 from configobj import ConfigObj
 from jinja2 import Environment, FileSystemLoader
-from yaml import Dumper
+
 
 user_home = os.path.expanduser("~")
 config_dir = os.path.join(user_home, ".config/ansible-scribe")
@@ -23,6 +24,13 @@ parser.add_argument(
     dest="conf_file",
 )
 parser.add_argument(
+    "-l",
+    "--log-level",
+    help="Set the log level. Defaults to INFO, but you may wish to bump it to WARNING",
+    default="INFO",
+    dest="log_level",
+)
+parser.add_argument(
     "-o",
     "--overwrite",
     help="Overwrite the files in place in the role directory",
@@ -34,10 +42,28 @@ parser.add_argument(
 )
 args, remaining_argv = parser.parse_known_args()
 
-settings = {}
-overwrite = args.overwrite
 conf_file = args.conf_file
 conf = ConfigObj(conf_file)
+
+acceptable_log_levels = ["INFO", "WARNING"]
+log_level = args.log_level
+overwrite = args.overwrite
+
+# Logging setup
+log = logging.getLogger()  # 'root' Logger
+console = logging.StreamHandler()
+format_str = "%(levelname)s: %(filename)s:%(lineno)s -- %(message)s"
+console.setFormatter(logging.Formatter(format_str))
+log.addHandler(console)
+if log_level.upper() not in acceptable_log_levels:
+    log.critical("Please choose either INFO or WARNING for log level")
+    sys.exit()
+elif log_level.upper() == "WARNING":
+    log.setLevel(logging.WARNING)
+else:
+    log.setLevel(logging.INFO)
+
+settings = {}
 settings["roles_path"] = conf["Paths"]["roles"]
 settings["playbooks_dir"] = conf["Paths"]["playbooks"]
 settings["output_dir"] = conf["Paths"]["output"]
@@ -66,9 +92,6 @@ def read_config(role):
         role_settings["galaxy_tags"] = conf["config"]["galaxy_tags"]
         role_settings["playbook"] = conf["config"]["playbook"]
 
-        if role_settings["issue_tracker"] == "":
-            print("empty")
-
         dependencies = []
         playbooks_dir = settings["playbooks_dir"]
         playbook = role_settings["playbook"]
@@ -77,7 +100,7 @@ def read_config(role):
             with open(playbook_file, "r") as p:
                 try:
                     data = yaml.safe_load(p)
-                    d = yaml.dump(data, Dumper=Dumper)
+                    d = yaml.dump(data, Dumper=yaml.Dumper)
                     role_settings["example_playbook"] = d
                     roles_list = []
                     for section in data:
@@ -108,6 +131,7 @@ def create_output_dir():
     output_dir = settings["output_dir"]
     try:
         os.makedirs(output_dir)
+        log.info("Created output directory")
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
@@ -166,24 +190,29 @@ def read_tasks(role):
 def read_defaults(role):
     """ Read the defaults file for the role to check if it's filled out """
     roles = settings["roles_path"]
-    default_vars = []
+    default_vars_dict = {}
     defaults_dir = os.path.join(roles, role, "defaults")
     defaults = os.path.join(defaults_dir, "main.yml")
     with open(defaults, "r") as d:
         num_lines = sum(1 for i in d)
         if num_lines <= 2:
-            print("WARNING: Default variables are not set")
+            log.warn("Default values are not set")
             return
     with open(defaults, "r") as d:
         data = yaml.safe_load(d)
         for key, value in data.items():
-            if value is None:
-                print("WARNING: {} has no value".format(key))
-                default_vars.append(key)
+            if key in default_vars_dict:
+                if value is None:
+                    default_vars_dict[key] = ""
+                else:
+                    default_vars_dict[key] = value
             else:
-                default_vars.append(key)
+                if value is None:
+                    default_vars_dict[key] = ""
+                else:
+                    default_vars_dict[key] = value
 
-    return default_vars
+    return default_vars_dict
 
 
 def write_repo_license(role):
@@ -208,6 +237,7 @@ def write_repo_license(role):
         role_repo_license = os.path.join(settings["output_dir"], repo_license.upper())
     with open(role_repo_license, "w") as rl:
         rl.write(data)
+        log.info("Wrote license file")
 
 
 def write_meta(role):
@@ -248,6 +278,7 @@ def write_meta(role):
         meta = os.path.join(settings["output_dir"], "meta.yml")
     with open(meta, "w") as m:
         m.write(data)
+        log.info("Wrote meta file")
 
 
 def write_readme(role):
@@ -261,7 +292,12 @@ def write_readme(role):
     dependencies = role_settings["dependencies"]
     example_playbook = role_settings["example_playbook"]
     templates = get_templates_path()
-    _, role_vars = read_tasks(role)
+    task_names, role_vars = read_tasks(role)
+
+    if not task_names:
+        log.warning(
+            "No task names found. Use task names to make your code easier to follow."
+        )
 
     template_loader = FileSystemLoader(searchpath=templates)
     template_env = Environment(loader=template_loader)
@@ -285,26 +321,43 @@ def write_readme(role):
         readme = os.path.join(settings["output_dir"], "readme.md")
     with open(readme, "w") as r:
         r.write(data)
+        log.info("Wrote README file")
 
 
 def write_defaults_file(role):
     """ Writes out any default variables that don't exist already """
     roles = settings["roles_path"]
-    default_vars = read_defaults(role)
-    task_names, role_vars = read_tasks(role)
-    vars_to_add = []
+    default_vars_dict = read_defaults(role)
+    _, role_vars = read_tasks(role)
+    templates = get_templates_path()
+    end_vars = []
+    for k, v in default_vars_dict.items():
+        if not v:
+            log.warning("{} does not currently have a default value".format(k))
+
     for var in role_vars:
-        if not default_vars or var not in default_vars:
-            vars_to_add.append(var)
+        if not default_vars_dict or var not in default_vars_dict:
+            end_vars.append(var.strip())
+            log.warning(
+                "{} does not currently have a default value".format(var.strip())
+            )
+
+    template_loader = FileSystemLoader(searchpath=templates)
+    template_env = Environment(loader=template_loader)
+    template = template_env.get_template("defaults.j2")
+    data = template.render(
+        role_name=role, defaults_dict=default_vars_dict, role_vars=end_vars
+    )
+
     if overwrite:
         defaults_dir = os.path.join(roles, role, "defaults")
         defaults = os.path.join(defaults_dir, "main.yml")
     else:
         defaults = os.path.join(settings["output_dir"], "defaults.yml")
 
-    with open(defaults, "a") as d:
-        for var in vars_to_add:
-            d.write(var)
+    with open(defaults, "w") as d:
+        d.write(data)
+        log.info("Wrote defaults variables file")
 
 
 def write_ci_file(ci_type, role):
@@ -321,6 +374,9 @@ def write_ci_file(ci_type, role):
 
     try:
         open(ci, "ab", 0).close()
+        log.warning("No CI file present")
+        log.info("Wrote CI file")
+        log.warning("You have an empty CI file, please set up CI testing")
     except OSError:
         pass
 
@@ -335,6 +391,7 @@ if __name__ == "__main__":
     try:
         settings["output_dir"]
     except NameError:
+        log.debug("Could not create output directory")
         pass
     else:
         create_output_dir()
