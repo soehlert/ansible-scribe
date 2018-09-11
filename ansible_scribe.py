@@ -386,8 +386,8 @@ def write_ci_file(ci_type, role):
         log.warning("No CI file present")
         log.info("Wrote CI file")
         log.warning("You have an empty CI file, please set up CI testing")
-    except OSError:
-        pass
+    except OSError as e:
+        log.warning(e)
 
 
 if __name__ == "__main__":
@@ -400,7 +400,7 @@ if __name__ == "__main__":
     try:
         settings["output_dir"]
     except NameError:
-        log.debug("Could not create output directory")
+        log.warning("Could not create output directory")
         pass
     else:
         create_output_dir()
