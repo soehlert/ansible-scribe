@@ -160,6 +160,7 @@ def get_task_files(role):
         if fn.endswith(".yaml") or fn.endswith(".yml"):
             full_path = os.path.join(tasks_dir, fn)
             task_files.append(full_path)
+
     return task_files
 
 
@@ -189,8 +190,8 @@ def read_tasks(role):
                             for k, v in module.items():
                                 if str(v).startswith("{{") and "item" not in v:
                                     role_vars.append(v.strip("{{ ").rstrip("}"))
-            except yaml.YAMLError:
-                pass
+            except yaml.YAMLError as e:
+                log.warning(e)
 
     return task_names, role_vars
 
