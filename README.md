@@ -1,4 +1,6 @@
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/1aee2b5314054ad4a751754fc7500342)](https://www.codacy.com/app/soehlert/ansible-scribe?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=soehlert/ansible-scribe&amp;utm_campaign=Badge_Grade)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/1aee2b5314054ad4a751754fc7500342)](https://www.codacy.com/app/soehlert/ansible-scribe?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=soehlert/ansible-scribe&amp;utm_campaign=Badge_Grade)    [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+
 
 ## Ansible Scribe
 
