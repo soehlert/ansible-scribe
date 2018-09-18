@@ -33,30 +33,45 @@ What to set up comes from: (https://galaxy.ansible.com/docs/contributing/index.h
 
 ### Inputs
 
-Config file (~/.config/ansible-scribe/global.conf) has settings for:
+Config file (~/.config/ansible-scribe/global.conf) example:
 
-- Roles path 
-- Playbooks path 
-- Inventory/inventory dir 
-- License 
-- Author 
-- Optional contact info/bio 
-- Optional company name 
-- Path for files created via just make (aka no overwrite) 
-- CI files you’d like 
+    [Paths]
+    roles = /etc/ansible/roles/
+    playbooks = /etc/ansible/playbooks/
+    output = /tmp/ansible-scribe/
 
+    [Metadata]
+    # License type (currently supported = apache, bsd2, bsd3, cc-by, gpl2, gpl3, isc, mit)
+    repo_license = mit
+    author = Sam Oehlert
+    bio = Security Engineer. email: sam.oehlert@gmail.com
+    company = My Company
 
-Config file for individual role(s) (~/.config/ansible-scribe/rolename.conf)
-- Associated playbook file name 
-- Version number for galaxy (or just pull from git tag?) 
-- Github/gitlab repo 
-- Description OR it will pull the task names 
-- Optional issue tracker url 
-- Outside prereqs 
-- Min_ansible_version 
-- Platform name 
-  - Version 
-- Galaxy tags 
+    [CI]
+    # What type of CI file you want to use (currently supported = gitlab, travis)
+    type = gitlab
+
+Role specific config file (~/.config/ansible-scribe/netdata.conf) example:
+
+    [versions]
+    ansible_min = 2.0
+    container_min = 
+    role = 1.0
+
+    [urls]
+    repo = https://github.com/soehlert/ansible-role-netdata
+    branch = master
+    issue_tracker =
+
+    [config]
+    description = Sets up the Netdata package for distributed real time performance and health monitoring
+    requirements = N/A
+    galaxy_tags = netdata deploy
+    playbook = common.yml
+
+    [platforms]
+    ubuntu = 16.04, 18.04
+
 
 Pass it a role:
 
