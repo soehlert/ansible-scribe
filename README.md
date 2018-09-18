@@ -30,6 +30,7 @@ Other tools exist for those things and Ansible Scribe follows the Unix Philosoph
 
 What to set up comes from: (https://galaxy.ansible.com/docs/contributing/index.html)
 
+
 ### Inputs
 
 Config file (~/.config/ansible-scribe/global.conf) has settings for:
@@ -60,7 +61,7 @@ Config file for individual role(s) (~/.config/ansible-scribe/rolename.conf)
 Pass it a role:
 
 1. reads all the variables and creates a table for them in the readme.
-  
+
     | Variable    | Purpose                              | Default |
     |-------------|--------------------------------------|---------|
     | apache_port | defines port for apache to listen on | 80      |
@@ -73,12 +74,14 @@ Pass it a role:
   2. Look for any roles that have namespace.rolename setup (adds to dependencies) 
 5. Warns if you are missing CI files or have empty CI files 
 
+
 ### Make file:
 
 - Make roles creates files in default file location outside of role path 
 - Make overwrite creates files in role path 
 - Make install creates empty config file
 - Makefile dynamic targets for each role ([https://stackoverflow.com/questions/22754778/dynamic-makefile-target](https://stackoverflow.com/questions/22754778/dynamic-makefile-target)) 
+
 
 ### Outputs
 
@@ -93,9 +96,3 @@ Pass it a role:
         2. Found empty file
     2. Empty defaults variables
     3. No task names
-
-### Other thoughts
-
-- Grab all yml/yaml files under roles/$role/tasks/*
-- Ignore variables like {{ item }} or {{ item.* }}
-- Watch out for include/import role in playbook
