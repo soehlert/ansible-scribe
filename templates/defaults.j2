@@ -1,6 +1,6 @@
 ---
 # defaults file for {{ role_name }}
-{% for key, value in defaults_dict.items() %}{{ key }}: {% if value is iterable and value is not string %}{% for v in value %}
+{% if defaults_dict %}{% for key, value in defaults_dict.items() %}{{ key }}: {% if value is iterable and value is not string %}{% for v in value %}
   - {{ v }}{% endfor %}{% else %}{{ value }}{% endif %}
-{% endfor %}{% for role_var in role_vars %}{{ role_var }}: {% endfor %}
+{% endfor %}{% for role_var in role_vars %}{{ role_var }}: {% endfor %}{% endif %}
 
