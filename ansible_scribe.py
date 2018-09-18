@@ -164,35 +164,89 @@ def get_task_files(role):
     return task_files
 
 
+def clean_var(variable):
+    """ Takes in a line we have identified as a variable and return a clean
+    version of it """
+    if "|" in variable:
+        v = "|"
+    elif "if" in variable:
+        v = "if"
+    elif "not" in variable:
+        v = "not"
+    elif "/" in variable:
+        print("hi")
+        v = "hi"
+    else:
+        v = "}"
+
+    clean = variable.strip("{{ ").split(v)[0].rstrip()
+
+    return clean
+
+
 def read_tasks(role):
     """ Reads in task files to build variables list and task list """
     task_names = []
     role_vars = []
     task_files = get_task_files(role)
-    extra_keys = [
+    ignore_keys = [
         "name",
         "with_items",
+        "with_fileglob",
+        "with_list",
+        "with_subelements",
+        "loop",
         "command",
         "when",
         "block",
         "delegate_to",
         "rescue",
         "args",
+        "notify",
+        "register",
+        "include",
+        "include_tasks",
+        "import",
+        "import_tasks",
+        "tags",
     ]
     for fn in task_files:
         with open(fn, "r") as f:
             try:
                 data = yaml.safe_load(f)
-                for task in data:
-                    task_names.append(task["name"])
-                    for task_name, module in task.items():
-                        if task_name not in extra_keys:
-                            for k, v in module.items():
-                                if str(v).startswith("{{") and "item" not in v:
-                                    role_vars.append(v.strip("{{ ").rstrip("}"))
+                if data:
+                    for task in data:
+                        if isinstance(task, str):
+                            task_names.append(task)
+                        elif isinstance(task, list):
+                            for t in task:
+                                task_names.append(t)
+                        elif isinstance(task, dict):
+                            if any(word in task for word in ignore_keys):
+                                for task_name, value in task.items():
+                                    if isinstance(value, dict):
+                                        for v in value:
+                                            task_names.append(v)
+                            else:
+                                print(task)
+                                task_names.append(task["name"])
+                            for task_name, module in task.items():
+                                if task_name not in ignore_keys:
+                                    if isinstance(module, bool):
+                                        continue
+                                    elif isinstance(module, str):
+                                        role_vars.append(clean_var(module))
+                                    elif isinstance(module, dict):
+                                        for k, v in module.items():
+                                            if (
+                                                str(v).startswith("{{")
+                                                and "item" not in v
+                                            ):
+                                                role_vars.append(clean_var(v))
             except yaml.YAMLError as e:
                 log.warning(e)
 
+    role_vars = list(set([v for v in role_vars if "item" not in v]))
     return task_names, role_vars
 
 
@@ -205,7 +259,7 @@ def read_defaults(role):
     with open(defaults, "r") as d:
         num_lines = sum(1 for i in d)
         if num_lines <= 2:
-            log.warn("Default values are not set")
+            log.warning("Default values are not set for {}".format(role))
             return
     with open(defaults, "r") as d:
         data = yaml.safe_load(d)
@@ -243,10 +297,12 @@ def write_repo_license(role):
             settings["roles_path"], role, repo_license.upper()
         )
     else:
-        role_repo_license = os.path.join(settings["output_dir"], repo_license.upper())
+        role_repo_license = os.path.join(
+            settings["output_dir"], role + repo_license.upper()
+        )
     with open(role_repo_license, "w") as rl:
         rl.write(data)
-        log.info("Wrote license file")
+        log.info("Wrote {} license file".format(role))
 
 
 def write_meta(role):
@@ -284,10 +340,10 @@ def write_meta(role):
     if overwrite:
         meta = os.path.join(settings["roles_path"], role, "meta", "main.yml")
     else:
-        meta = os.path.join(settings["output_dir"], "meta.yml")
+        meta = os.path.join(settings["output_dir"], role + "-" + "meta.yml")
     with open(meta, "w") as m:
         m.write(data)
-        log.info("Wrote meta file")
+        log.info("Wrote {} meta file".format(role))
 
 
 def write_readme(role):
@@ -301,11 +357,17 @@ def write_readme(role):
     dependencies = role_settings["dependencies"]
     example_playbook = role_settings["example_playbook"]
     templates = get_templates_path()
-    task_names, role_vars = read_tasks(role)
+    try:
+        task_names, role_vars = read_tasks(role)
+    except TypeError as te:
+        log.critical("{}: {}".format(role, te))
+        raise
 
     if not task_names:
         log.warning(
-            "No task names found. Use task names to make your code easier to follow."
+            "No task names in {}. Task names make your code easier to follow.".format(
+                role
+            )
         )
 
     template_loader = FileSystemLoader(searchpath=templates)
@@ -327,10 +389,10 @@ def write_readme(role):
     if overwrite:
         readme = os.path.join(settings["roles_path"], role, "README.md")
     else:
-        readme = os.path.join(settings["output_dir"], "readme.md")
+        readme = os.path.join(settings["output_dir"], role + "-" + "readme.md")
     with open(readme, "w") as r:
         r.write(data)
-        log.info("Wrote README file")
+        log.info("Wrote {} README file".format(role))
 
 
 def write_defaults_file(role):
@@ -340,16 +402,18 @@ def write_defaults_file(role):
     _, role_vars = read_tasks(role)
     templates = get_templates_path()
     end_vars = []
-    for k, v in default_vars_dict.items():
-        if not v:
-            log.warning("{} does not currently have a default value".format(k))
+    if default_vars_dict:
+        for k, v in default_vars_dict.items():
+            if not v:
+                clean = clean_var(k)
+                log.warning("{} does not currently have a default value".format(clean))
 
+    print(role_vars)
     for var in role_vars:
         if not default_vars_dict or var not in default_vars_dict:
-            end_vars.append(var.strip())
-            log.warning(
-                "{} does not currently have a default value".format(var.strip())
-            )
+            clean = clean_var(var)
+            end_vars.append(clean)
+            log.warning("{} does not currently have a default value".format(clean))
 
     template_loader = FileSystemLoader(searchpath=templates)
     template_env = Environment(loader=template_loader)
@@ -362,11 +426,11 @@ def write_defaults_file(role):
         defaults_dir = os.path.join(roles, role, "defaults")
         defaults = os.path.join(defaults_dir, "main.yml")
     else:
-        defaults = os.path.join(settings["output_dir"], "defaults.yml")
+        defaults = os.path.join(settings["output_dir"], role + "-" + "defaults.yml")
 
     with open(defaults, "w") as d:
         d.write(data)
-        log.info("Wrote defaults variables file")
+        log.info("Wrote {} defaults variables file".format(role))
 
 
 def write_ci_file(ci_type, role):
@@ -377,15 +441,17 @@ def write_ci_file(ci_type, role):
         ci_file = ".travis.yml"
 
     if overwrite:
-        ci = os.path.join(settings["roles_path"], role, ci_file)
+        ci = os.path.join(settings["roles_path"], role, role + "-" + ci_file)
     else:
         ci = os.path.join(settings["output_dir"], ci_file)
 
     try:
         open(ci, "ab", 0).close()
-        log.warning("No CI file present")
-        log.info("Wrote CI file")
-        log.warning("You have an empty CI file, please set up CI testing")
+        log.warning("No CI file present for {}".format(role))
+        log.info("Wrote {} CI file".format(role))
+        log.warning(
+            "You have an empty CI file, please set up CI testing for {}".format(role)
+        )
     except OSError as e:
         log.warning(e)
 
