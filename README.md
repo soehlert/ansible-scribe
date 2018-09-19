@@ -71,9 +71,11 @@ Role specific config file (~/.config/ansible-scribe/netdata.conf) example:
 
     [platforms]
     ubuntu = 16.04, 18.04
+    redhat = 7
+    centos = 7
 
 
-Pass it a role:
+### What it Does When You Pass it a Role
 
 1. reads all the variables and creates a table for them in the readme.
 
@@ -84,18 +86,10 @@ Pass it a role:
 
 2. Makes sure all the variables are in the defaults/main.yml file 
 3. Takes task names and sets them in a list in readme.md file to give you a skeleton to build off of 
-4. Reads playbook in order to 
+4. Reads playbook in order to: 
   1. Add copy of example playbook to readme 
   2. Look for any roles that have namespace.rolename setup (adds to dependencies) 
 5. Warns if you are missing CI files or have empty CI files 
-
-
-### Make file:
-
-- Make roles creates files in default file location outside of role path 
-- Make overwrite creates files in role path 
-- Make install creates empty config file
-- Makefile dynamic targets for each role ([https://stackoverflow.com/questions/22754778/dynamic-makefile-target](https://stackoverflow.com/questions/22754778/dynamic-makefile-target)) 
 
 
 ### Outputs
@@ -111,3 +105,21 @@ Pass it a role:
         2. Found empty file
     2. Empty defaults variables
     3. No task names
+
+### Todo
+
+- [ ] Fix up readme
+- [ ] Makefile
+- [ ] Unit tests
+- [ ] Clean_variables to regex
+- [ ] Clean up variables more
+- [ ] Package
+- [ ] Investigate moving to class based
+
+
+### Make file:
+
+- Make roles creates files in default file location outside of role path 
+- Make overwrite creates files in role path 
+- Make install creates empty config file
+- Makefile dynamic targets for each role ([https://stackoverflow.com/questions/22754778/dynamic-makefile-target](https://stackoverflow.com/questions/22754778/dynamic-makefile-target)) 
