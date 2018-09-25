@@ -5,6 +5,7 @@ import datetime
 import errno
 import logging
 import os
+import re
 import sys
 import yaml
 
@@ -120,7 +121,7 @@ def read_config(role):
                             if "." in role:
                                 dependencies.append(role)
                 except yaml.YAMLError as exc:
-                    print(exc)
+                    raise (exc)
         role_settings["dependencies"] = dependencies
 
         pforms = {}
@@ -154,12 +155,17 @@ def get_templates_path():
 
 def get_task_files(role):
     """ Function to grab all the tasks files we will need """
+    tasks = []
     task_files = []
     tasks_dir = os.path.join(settings["roles_path"], role, "tasks")
     for fn in os.listdir(tasks_dir):
         if fn.endswith(".yaml") or fn.endswith(".yml"):
             full_path = os.path.join(tasks_dir, fn)
-            task_files.append(full_path)
+            tasks.append(full_path)
+
+    for t in tasks:
+        if t not in task_files:
+            task_files.append(t)
 
     return task_files
 
@@ -167,21 +173,12 @@ def get_task_files(role):
 def clean_var(variable):
     """ Takes in a line we have identified as a variable and return a clean
     version of it """
-    if "|" in variable:
-        v = "|"
-    elif "if" in variable:
-        v = "if"
-    elif "not" in variable:
-        v = "not"
-    elif "/" in variable:
-        print("hi")
-        v = "hi"
-    else:
-        v = "}"
+    regex = re.compile(r"{{\s\b(?P<variable_name>\w+)\s\B")
 
-    clean = variable.strip("{{ ").split(v)[0].rstrip()
+    clean = re.findall(regex, variable)
+    cleaned = ", ".join(clean)
 
-    return clean
+    return cleaned
 
 
 def read_tasks(role):
@@ -191,10 +188,6 @@ def read_tasks(role):
     task_files = get_task_files(role)
     ignore_keys = [
         "name",
-        "with_items",
-        "with_fileglob",
-        "with_list",
-        "with_subelements",
         "loop",
         "command",
         "when",
@@ -210,6 +203,7 @@ def read_tasks(role):
         "import_tasks",
         "tags",
     ]
+
     for fn in task_files:
         with open(fn, "r") as f:
             try:
@@ -222,14 +216,9 @@ def read_tasks(role):
                             for t in task:
                                 task_names.append(t)
                         elif isinstance(task, dict):
-                            if any(word in task for word in ignore_keys):
-                                for task_name, value in task.items():
-                                    if isinstance(value, dict):
-                                        for v in value:
-                                            task_names.append(v)
-                            else:
-                                print(task)
-                                task_names.append(task["name"])
+                            for t, v in task.items():
+                                if t == "name":
+                                    task_names.append(v)
                             for task_name, module in task.items():
                                 if task_name not in ignore_keys:
                                     if isinstance(module, bool):
@@ -401,25 +390,28 @@ def write_defaults_file(role):
     default_vars_dict = read_defaults(role)
     _, role_vars = read_tasks(role)
     templates = get_templates_path()
-    end_vars = []
+    vars_list = []
+
     if default_vars_dict:
         for k, v in default_vars_dict.items():
             if not v:
-                clean = clean_var(k)
-                log.warning("{} does not currently have a default value".format(clean))
+                log.warning("{} does not currently have a default value".format(k))
 
-    print(role_vars)
     for var in role_vars:
-        if not default_vars_dict or var not in default_vars_dict:
-            clean = clean_var(var)
-            end_vars.append(clean)
-            log.warning("{} does not currently have a default value".format(clean))
+        if var != "":
+            vars_list.append(var)
+            log.warning("{} does not currently have a default value".format(var))
+
+    end_vars = []
+    for v in vars_list:
+        if v != "":
+            end_vars.append(v)
 
     template_loader = FileSystemLoader(searchpath=templates)
     template_env = Environment(loader=template_loader)
     template = template_env.get_template("defaults.j2")
     data = template.render(
-        role_name=role, defaults_dict=default_vars_dict, role_vars=end_vars
+        role_name=role, defaults_dict=default_vars_dict, variables=end_vars
     )
 
     if overwrite:
