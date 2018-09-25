@@ -167,8 +167,6 @@ def get_task_files(role):
         if t not in task_files:
             task_files.append(t)
 
-    print(task_files)
-
     return task_files
 
 
@@ -190,10 +188,6 @@ def read_tasks(role):
     task_files = get_task_files(role)
     ignore_keys = [
         "name",
-        "with_items",
-        "with_fileglob",
-        "with_list",
-        "with_subelements",
         "loop",
         "command",
         "when",
@@ -209,6 +203,7 @@ def read_tasks(role):
         "import_tasks",
         "tags",
     ]
+
     for fn in task_files:
         with open(fn, "r") as f:
             try:
@@ -221,13 +216,9 @@ def read_tasks(role):
                             for t in task:
                                 task_names.append(t)
                         elif isinstance(task, dict):
-                            if any(word in task for word in ignore_keys):
-                                for task_name, value in task.items():
-                                    if isinstance(value, dict):
-                                        for v in value:
-                                            task_names.append(v)
-                            else:
-                                task_names.append(task["name"])
+                            for t, v in task.items():
+                                if t == "name":
+                                    task_names.append(v)
                             for task_name, module in task.items():
                                 if task_name not in ignore_keys:
                                     if isinstance(module, bool):
@@ -399,24 +390,28 @@ def write_defaults_file(role):
     default_vars_dict = read_defaults(role)
     _, role_vars = read_tasks(role)
     templates = get_templates_path()
-    end_vars = []
+    vars_list = []
+
     if default_vars_dict:
         for k, v in default_vars_dict.items():
             if not v:
-                clean = clean_var(k)
-                log.warning("{} does not currently have a default value".format(clean))
+                log.warning("{} does not currently have a default value".format(k))
 
     for var in role_vars:
-        if not default_vars_dict or var not in default_vars_dict:
-            clean = clean_var(var)
-            end_vars.append(clean)
-            log.warning("{} does not currently have a default value".format(clean))
+        if var != "":
+            vars_list.append(var)
+            log.warning("{} does not currently have a default value".format(var))
+
+    end_vars = []
+    for v in vars_list:
+        if v != "":
+            end_vars.append(v)
 
     template_loader = FileSystemLoader(searchpath=templates)
     template_env = Environment(loader=template_loader)
     template = template_env.get_template("defaults.j2")
     data = template.render(
-        role_name=role, defaults_dict=default_vars_dict, role_vars=end_vars
+        role_name=role, defaults_dict=default_vars_dict, variables=end_vars
     )
 
     if overwrite:
