@@ -5,6 +5,7 @@ import datetime
 import errno
 import logging
 import os
+import re
 import sys
 import yaml
 
@@ -120,7 +121,7 @@ def read_config(role):
                             if "." in role:
                                 dependencies.append(role)
                 except yaml.YAMLError as exc:
-                    print(exc)
+                    raise (exc)
         role_settings["dependencies"] = dependencies
 
         pforms = {}
@@ -154,12 +155,19 @@ def get_templates_path():
 
 def get_task_files(role):
     """ Function to grab all the tasks files we will need """
+    tasks = []
     task_files = []
     tasks_dir = os.path.join(settings["roles_path"], role, "tasks")
     for fn in os.listdir(tasks_dir):
         if fn.endswith(".yaml") or fn.endswith(".yml"):
             full_path = os.path.join(tasks_dir, fn)
-            task_files.append(full_path)
+            tasks.append(full_path)
+
+    for t in tasks:
+        if t not in task_files:
+            task_files.append(t)
+
+    print(task_files)
 
     return task_files
 
@@ -167,21 +175,12 @@ def get_task_files(role):
 def clean_var(variable):
     """ Takes in a line we have identified as a variable and return a clean
     version of it """
-    if "|" in variable:
-        v = "|"
-    elif "if" in variable:
-        v = "if"
-    elif "not" in variable:
-        v = "not"
-    elif "/" in variable:
-        print("hi")
-        v = "hi"
-    else:
-        v = "}"
+    regex = re.compile(r"{{\s\b(?P<variable_name>\w+)\s\B")
 
-    clean = variable.strip("{{ ").split(v)[0].rstrip()
+    clean = re.findall(regex, variable)
+    cleaned = ", ".join(clean)
 
-    return clean
+    return cleaned
 
 
 def read_tasks(role):
@@ -228,7 +227,6 @@ def read_tasks(role):
                                         for v in value:
                                             task_names.append(v)
                             else:
-                                print(task)
                                 task_names.append(task["name"])
                             for task_name, module in task.items():
                                 if task_name not in ignore_keys:
@@ -408,7 +406,6 @@ def write_defaults_file(role):
                 clean = clean_var(k)
                 log.warning("{} does not currently have a default value".format(clean))
 
-    print(role_vars)
     for var in role_vars:
         if not default_vars_dict or var not in default_vars_dict:
             clean = clean_var(var)
