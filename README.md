@@ -108,13 +108,13 @@ Role specific config file (~/.config/ansible-scribe/netdata.conf) example:
 
 ### Todo
 
-- [ ] Fix up readme
+- [√] Fix up readme
 - [ ] Makefile
 - [ ] Unit tests
 - [ ] Clean_variables to regex
 - [ ] Clean up variables more
-- [ ] Package
-- [ ] Investigate moving to class based
+- [√] Package
+- [√] Investigate moving to class based
 
 
 ### Make file:
