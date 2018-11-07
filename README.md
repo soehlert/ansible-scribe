@@ -30,6 +30,12 @@ Other tools exist for those things and Ansible Scribe follows the Unix Philosoph
 
 What to set up comes from: (https://galaxy.ansible.com/docs/contributing/index.html)
 
+### Installation
+
+Ansible-scribe is available from pypi:
+
+    pip install ansible-scribe
+
 
 ### Inputs
 
